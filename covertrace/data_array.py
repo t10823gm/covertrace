@@ -9,7 +9,6 @@ Due to the memory issue, we do not want to load all the data at once.
 from __future__ import division
 from os.path import join, basename, exists, abspath, dirname
 from itertools import izip, izip_longest, product
-import pickle
 import os
 import matplotlib.pyplot as plt
 import numpy as np
@@ -18,7 +17,8 @@ import re
 from scipy.ndimage import imread
 from functools import partial
 from image_vis import ImageVis
-from joblib import Parallel, delayed
+from LabeledArray.labeledarray.labeledarray import LabeledArray
+from LabeledArray.labeledarray.utils import uniform_list_length, sort_labels_and_arr
 
 
 class Stage(object):
@@ -28,6 +28,7 @@ class Stage(object):
     _any = True
     new_file_name = 'arr_modified.npz'
 
+staged = Stage()
 
 class Plotter(object):
     def __init__(self, slice_prop, operation):
@@ -143,34 +144,6 @@ class Sites(object):
         return len([num for num, i in enumerate(self)])
 
 
-# class ParSites(object):
-#     def __init__(self, parent_folder, subfolders=None, conditions=[],
-#                  file_name='arr.npz', ncores=4):
-#         self.ncores = ncores
-#         nlen = [int(i * np.ceil(len(subfolders))/ncores) for i in range(ncores)]
-#         nlen.append(None)
-#         for i, ii in zip(nlen[:-1], nlen[1:]):
-#             self.sites_list.append(Sites(parent_folder, subfolders[i:ii],
-#                                          conditions=[], file_name='arr.npz'))
-
-#     def __getattr__(self, name):
-#         for sites in self.sites_list:
-#             sites.__getattr__(name)
-
-#     @staticmethod
-#     def par_getattr(sites, name):
-#         sites.__getattr__(name)
-
-#     def iterate(self, operation, pid=None, *args, **kwargs):
-#         if 'ops_plotter' in operation.func.__module__:
-#             plotter = Plotter(self.collect(), operation)
-#             fig, axes = plotter.plot()
-#             return fig, axes
-#         else:
-#             Parallel(n_jobs=self.ncores)(delayed(self.par_getattr)(sites, 'operate',
-#                                          pid=pid) for sites in self.sites_list)
-
-
 class Site(object):
     """name: equivalent to attribute name of Sites
     """
@@ -282,6 +255,98 @@ class ImageHolder(object):
         return imread(join(self.dir, 'outlines', obj_file_name))
 
 
+class DataArray(LabeledArray):
+    def __new__(cls, arr=None, labels=None, idx=None, state=None, staged=None, name=None):
+        if not isinstance(labels, np.ndarray) and labels is not None:
+            zero_arr = np.expand_dims(np.zeros(arr[0, :, :].shape), axis=0)
+            arr = np.concatenate([zero_arr, arr], axis=0)
+            labels.insert(0, ['prop'])
+
+            labels, arr = sort_labels_and_arr(labels, arr)
+            labels = np.array(uniform_list_length(labels), dtype=object)
+        obj = np.asarray(arr).view(cls)
+        obj.labels = labels
+        obj.idx = idx
+        try:
+            obj.time = np.arange(obj.shape[-1])
+        except:
+            pass
+        obj.name, obj._state, obj._staged = name, state, staged
+        if staged is None:
+            obj._staged = Stage()
+        return obj
+
+    @property
+    def prop(self):
+        '''Returns 2D slice of data, prop. '''
+        return self['prop']
+
+    @property
+    def slice_arr(self):
+        '''If state is a list of lists, return a list of arr.
+        If state is a single list, return 2D or 3D numpy array.
+        '''
+        if isinstance(self._state[0], list):
+            arr_list = []
+            for st in self._state:
+                arr_list.append(self.__getitem__(tuple(st)))
+            return arr_list
+        elif isinstance(self._state[0], str):
+            return self.__getitem__(tuple(self._state))
+        else:
+            return self.arr
+
+    @property
+    def slice_prop(self):
+        '''Return a list of dict containing array sliced by prop value.'''
+        ret = []
+        if isinstance(self._state[0], str):
+            slice_arr = [self.slice_arr, ]
+            state = [self._state, ]
+        else:
+            slice_arr = self.slice_arr
+            state = self._state
+        prop_set = np.unique(self['prop'])
+        for num, warr in enumerate(slice_arr):
+            for pi in prop_set:
+                ret.append(dict(arr=self.extract_prop_slice(warr, self.prop, pid=pi),
+                                name=self.name, prop=int(pi), labels=state[num], time=self.time))
+        return ret
+
+    def extract_prop_slice(self, arr, prop, pid=None):
+        bool_ind = self.retrieve_bool_ind(prop, pid, self._staged)
+        return np.take(arr, np.where(bool_ind)[0], axis=-2)
+
+    @staticmethod
+    def retrieve_bool_ind(prop, pid, staged):
+        func = np.any if staged._any else np.all
+        return func(prop == pid, axis=1)
+
+    @staticmethod
+    def retrieve_bool_ind(prop, pid, staged):
+        func = np.any if staged._any else np.all
+        return func(prop == pid, axis=1)
+
+    def mark_prop_nan(self, pid):
+        self.arr[:, self.prop == pid] = np.nan
+
+    def _add_null_field(self, new_label):
+        new_label = list(new_label) if isinstance(new_label, str) else new_label
+        zero_arr = np.expand_dims(np.zeros(self.arr[0, :, :].shape), axis=0)
+        self.arr = np.concatenate([self.arr, zero_arr], axis=0)
+        self.labels.append(tuple(new_label))
+
+    def translate_prop_to_arr(self, new_label):
+        self._add_null_field(new_label)
+        self.arr[new_label] = self.prop.copy()
+
+    def drop_cells(self, pid):
+        '''Drop cells.
+        '''
+        bool_ind = self.retrieve_bool_ind(self.prop, pid, self._staged)
+        self.arr = np.take(self.arr, np.where(-bool_ind)[0], axis=-2)
+
+
 class DataHolder(object):
     '''
     >>> labels = [i for i in product(['nuc', 'cyto'], ['CFP', 'YFP'], ['x', 'y'])]
@@ -385,5 +450,14 @@ class DataHolder(object):
         bool_ind = self.retrieve_bool_ind(self.prop, pid, self._staged)
         self.arr = np.take(self.arr, np.where(-bool_ind)[0], axis=-2)
 
+
 if __name__ == '__main__':
-    pass
+    labels = [i for i in product(['nuc', 'cyto'], ['CFP', 'YFP'], ['x', 'y'])]
+    arr = np.zeros((len(labels), 10, 5))
+    da = DataArray(arr, labels)
+    da._state = [['nuc', 'CFP', 'x'], ['nuc', 'CFP', 'y']]
+    assert len(da.slice_arr) == 2
+    da._state = ['nuc', 'CFP', 'x']
+    assert da.slice_arr.shape == (10, 5)
+    da['prop'][1, :] = 1
+    print da.slice_prop
