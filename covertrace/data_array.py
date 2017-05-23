@@ -1,6 +1,6 @@
 import numpy as np
 from os.path import join, basename, dirname
-from LabeledArray.labeledarray.labeledarray import LabeledArray
+from labeledarray import LabeledArray
 from collections import OrderedDict
 from utils.canvas import canvas
 from itertools import izip_longest
