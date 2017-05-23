@@ -5,6 +5,17 @@ import numpy as np
 from functools import partial
 from utils.array_handling import extend_true, skip_outside_frame_start_to_end
 import pandas as pd
+from collections import OrderedDict
+
+
+def iterate_sites(func):
+    def wrapper(arr, **args):
+        if isinstance(arr, OrderedDict):
+            for key, value in arr.iteritems():
+                func(value, **args)
+        else:
+            func(arr, **args)
+    return wrapper
 
 
 def normalize_data(arr):
