@@ -1,8 +1,11 @@
 import numpy as np
 from os.path import join, basename, dirname
-from labeledarray import LabeledArray
+try:
+    from labeledarray import LabeledArray
+except:
+    from covertrace.labeledarray import LabeledArray
 from collections import OrderedDict
-from utils.canvas import canvas
+from covertrace.utils.canvas import canvas
 from itertools import izip_longest
 
 
