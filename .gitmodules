@@ -1,3 +1,0 @@
-[submodule "covertrace/labeledarray"]
-	path = covertrace/labeledarray
-	url = https://github.com/braysia/labeledarray.git
