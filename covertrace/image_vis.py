@@ -95,11 +95,12 @@ def mergePlots(site, location, label, seq_cell):
         for (j, k) in enumerate(tmp_cellid2):
             if i == k:
                 seq_idx.append(j)
-    acell = np.zeros([tmp_parent.shape[1]])
-    acell[:] = np.nan
-    for l in seq_idx:
-        tmp_idx = np.where(~np.isnan(tmp_intensity[l, :]))
-        acell[min(tmp_idx[0]):max(tmp_idx[0])] = tmp_intensity[l, :][min(tmp_idx[0]):max(tmp_idx[0])]
+    acell = np.zeros([tmp_parent.shape[1], len(seq_cell)])
+    acell[:,:] = np.nan
+    for l, cid in enumerate(seq_idx):
+        tmp_idx = np.where(~np.isnan(tmp_intensity[cid, :]))
+        acell[min(tmp_idx[0]):max(tmp_idx[0]), l] = tmp_intensity[cid, :][min(tmp_idx[0]):max(tmp_idx[0])]
+    acell = np.nanmax(acell, axis=1)
     return acell
 
 def plotSingleTrace(seq_cell, sub_folders):
