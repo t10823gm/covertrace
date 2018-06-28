@@ -115,3 +115,64 @@ def rm_short_trace(ref_dataarray, thres=200, *ref_dataarray2):
             for n in ref_dataarray2:
                 n[m][:] = np.nan
     return 
+
+def div_align (site, cellid_list, location, label, align_point=433, window_size=866):
+    """
+    : site :
+    : cellid_list : list of 'cell_id sequence' for cell alignment at division point. / e.g. single_idlidt, double_idlist
+    : location : 'nuc' or 'cyto'
+    : label : 
+    : align_point : 
+    : window_size :
+    : return : data array of several cell property
+    """
+    # Load data sets
+    all_intensity = site[location, label, 'mean_intensity']
+    #all_parent = site[location, label, 'parent']
+    all_cellid = site[location, label, 'cell_id']
+    detected_idlist = np.nanmin(all_cellid, axis=1) # extraction of indivisual cell_id
+
+    # data allocation
+    tmp_argray = []
+
+    # index search of each cell_id in data_array
+    for n, seq_cell in enumerate(cellid_list):
+        print len(seq_cell)
+        tmp_cell = np.zeros([window_size, len(seq_cell)])
+        tmp_cell[:] = np.nan
+        #print seq_cell
+        seq_idx = []
+        for i in seq_cell:
+            #print i
+            idx = np.where(detected_idlist == i)
+            #print idx
+            #print idx[0][0]
+            try:
+                seq_idx.append(idx[0][0])
+            except:
+                pass
+        #print "index in array:", seq_idx
+        try:
+            for m, idx in enumerate(seq_idx): 
+                #print m
+                tmp_idx = np.where(~np.isnan(all_intensity[idx, :])) # get timepoint information
+                #print tmp_idx
+            
+                if m == 0:
+                    # mother cell
+                    # set data to align point
+                    #print align_point - (max(tmp_idx[0] - min(tmp_idx[0])))
+                    #print all_cellid[idx, :][min(tmp_idx[0]):max(tmp_idx[0])]
+                    #print all_intensity[idx, :][min(tmp_idx[0]):max(tmp_idx[0])]
+                    tmp_cell[align_point - (max(tmp_idx[0] - min(tmp_idx[0]))) : align_point, 0] = all_intensity[idx, :][min(tmp_idx[0]):max(tmp_idx[0])]
+                    #print tmp_cell
+                else:
+                    end_idx = max(np.where(~np.isnan(tmp_cell))[0])
+                    tmp_cell[end_idx +1:(end_idx + 1 + max(tmp_idx[0])-min(tmp_idx[0])), m] = all_intensity[idx, :][min(tmp_idx[0]):max(tmp_idx[0])]
+                    pass
+            tmp_cell = np.nanmax(tmp_cell, axis=1)
+            tmp_array.append(tmp_cell)
+        except:
+                pass
+    #print seq_idx
+    return np.asanyarray(tmp_array)
