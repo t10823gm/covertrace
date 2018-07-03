@@ -139,6 +139,11 @@ def min_max(x, axis=None):
     result = (x-min)/(max-min)
     return result
 
+def array_min_max(ndarray):
+    for i, data in enumerate(ndarray):
+        ndarray[i] = min_max(data)
+    return ndarray
+
 def detect_onset(FP_int, thres, window_length=15, polyorder=5):
     sv = signal.savgol_filter(FP_int, window_length, polyorder)
     mmsv= min_max(sv)
@@ -150,10 +155,37 @@ def detect_onset(FP_int, thres, window_length=15, polyorder=5):
             break
     return i, tmp[9]
 
-def detect_peak(FP_int, window_length=15, polyorder=5):
-    sg = signal.savgol_filter(FP_int, window_length, polyorder)
-    maxindx_sg = signal.argrelmax(sg[0], order=10) 
-    return maxindx_sg
+def detect_peaks(FP_array, window_length=15, polyorder=5, argmax_order=10):
+    """
+    : FP_array : data_array
+    : window_length : for sv
+    : polyorder : for sv
+    : argmax_order : for argmax
+    : peak_points : list of peak index
+    A cell has sigle peak point
+    """
+    peak_points = []
+    for z, tmp_strip in enumerate(FP_array):
+        tmp_peaks =[]
+        tmp_ind = np.argwhere(~np.isnan(tmp_strip))
+        if len(tmp_ind) != 0:
+            int_data = tmp_strip[tmp_ind[0]:tmp_ind[-1]]
+            nan_ind = np.argwhere(np.isnan(int_data))
+            #print z, nan_ind
+            if len(nan_ind) != 0:
+                for j in nan_ind:
+                    int_data[j] = np.nanmean(int_data[j-2 : j+2])
+            else:
+                pass
+            sg = signal.savgol_filter(int_data, window_length, polyorder)
+            maxindx_sg = signal.argrelmax(sg, order=argmax_order)
+            if len(maxindx_sg[0]) != 0:  
+                peak_points.append(maxindx_sg[0][np.argmax(int_data[maxindx_sg])])
+            else:
+                peak_points.append([])
+        else:
+            peak_points.append([])    
+    return peak_points
 
 def add_intdata(site, id_list, np_dataarray, location, label, type = 0):
     """
@@ -176,3 +208,16 @@ def add_intdata(site, id_list, np_dataarray, location, label, type = 0):
                 #print pre, i[1]
                 pre = i[1]
     return np_dataarray
+
+def tplength_sort(data_array):
+    import itertools
+    tp_list =[]
+    for i, data in enumerate(data_array):
+        tp = sum(~np.isnan(data_array[i]))
+        tp_list.append(tp)
+
+    adict = dict(itertools.izip(tp_list,data_array))
+    sort_adict = sorted(adict.items())
+    sort_tp, sort_array = zip(*sort_adict)
+
+    return  sort_array
