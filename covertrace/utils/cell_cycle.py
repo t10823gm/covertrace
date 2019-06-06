@@ -1,4 +1,6 @@
 import numpy as np
+from scipy import signal
+from covertrace.image_vis import min_max
 
 def division_count(celllist, single_idlist, double_idlist):
     """Count a number of cell division
@@ -104,14 +106,14 @@ def set_phase(FP_array, S_start, S_end):
             wholecycle.append([])
     return g1phase, sphase, g2mphase, wholecycle
 
-def rm_short_trace(ref_dataarray, thres=200, *ref_dataarray2):
+def rm_short_trace(ref_dataarray, thres_nan=200, *ref_dataarray2):
     """
     ref_dataarray : referernce
-    thres : threshold for discarding data
+    thres : threshold for discarding data 
     ref_dataarray2 : arrays to apply thresholding
     """
     for m, data  in enumerate(ref_dataarray):
-        if sum(np.isnan(data)) > thres:
+        if sum(np.isnan(data)) > thres_nan:
             for n in ref_dataarray2:
                 n[m][:] = np.nan
     return 
@@ -133,8 +135,8 @@ def div_align (site, cellid_list, location, label, align_point=433, window_size=
     detected_idlist = np.nanmin(all_cellid, axis=1) # extraction of indivisual cell_id
 
     # data allocation
-    tmp_argray = []
-
+    tmp_array = []
+    
     # index search of each cell_id in data_array
     for n, seq_cell in enumerate(cellid_list):
         print len(seq_cell)

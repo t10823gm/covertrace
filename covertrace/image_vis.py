@@ -197,16 +197,22 @@ def add_intdata(site, id_list, np_dataarray, location, label, type = 0):
     """
     pre = 0
     for i in id_list:
-        if pre != i[1]:
-            if type == 0:
-                tmp = mergePlots(site, location, label, i)
-                np_dataarray.append(tmp)
-            elif type == 1:
-                #tmp = site[location, label, 'mean_intensity']
-                tmp = mergePlots(site, location, label, [i[1]])
-                np_dataarray.append(tmp)
-                #print pre, i[1]
-                pre = i[1]
+        if len(i) == 1:
+            # no cell division
+            tmp = mergePlots(site, location, label, i)
+            np_dataarray.append(tmp)
+        else:
+            if pre != i[1]:
+            # more than 1 cell division
+                if type == 0:
+                    tmp = mergePlots(site, location, label, i)
+                    np_dataarray.append(tmp)
+                elif type == 1:
+                    #tmp = site[location, label, 'mean_intensity']
+                    tmp = mergePlots(site, location, label, [i[1]])
+                    np_dataarray.append(tmp)
+                    #print pre, i[1]
+                    pre = i[1]
     return np_dataarray
 
 def tplength_sort(data_array):
